@@ -1,0 +1,51 @@
+name: Upstream Sync
+
+# 每天同步 wangwangit/SubsTracker 上游到本 fork 的 master。
+# 同步推送到 master 后，上游自带的 Deploy workflow 会自动部署到 Cloudflare。
+# 合并冲突时一律按上游为准（本 fork 不应在 master 上留自有改动；
+# KV 绑定靠标题 SUBSCRIPTIONS_KV 在部署脚本里自动对齐，无需改 wrangler.toml）。
+
+on:
+  schedule:
+    - cron: "17 2 * * *" # UTC 02:17，约北京时间 10:17
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge upstream
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/wangwangit/SubsTracker.git
+          git fetch upstream
+          if git merge-base --is-ancestor upstream/master HEAD; then
+            echo "Already up to date."
+            exit 0
+          fi
+          git merge upstream/master --no-edit || true
+          # 残留冲突一律按上游解决
+          if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+            for f in $(git diff --name-only --diff-filter=U); do
+              if git cat-file -e "upstream/master:$f" 2>/dev/null; then
+                git checkout upstream/master -- "$f"
+              else
+                git rm -f -- "$f" 2>/dev/null || rm -f -- "$f"
+              fi
+            done
+            git add -A
+            git commit --no-edit
+          fi
+          git push origin HEAD:master
