@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     name: Deploy to Cloudflare Workers
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 需要在 GitHub 仓库 Settings → Secrets 配置：
     #   CLOUDFLARE_API_TOKEN  (Workers 编辑 + KV 编辑权限)
     #   CLOUDFLARE_ACCOUNT_ID (可选；Token 可锁定到单 account)
